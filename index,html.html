@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>영향력 파워 진단</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&family=Gmarket+Sans:wght@300;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --card: #1a1a26;
+    --border: #2a2a40;
+    --accent1: #c89b5f;
+    --accent2: #7b68ee;
+    --accent3: #4ecdc4;
+    --text: #e8e4da;
+    --text-muted: #888;
+    --danger: #e05c6a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Gmarket Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Noise texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.4;
+  }
+
+  /* Ambient glow */
+  .ambient {
+    position: fixed;
+    width: 600px; height: 600px;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.12;
+  }
+  .ambient-1 { background: var(--accent2); top: -200px; left: -100px; }
+  .ambient-2 { background: var(--accent1); bottom: -200px; right: -100px; }
+
+  /* ── SCREENS ── */
+  .screen { display: none; position: relative; z-index: 1; }
+  .screen.active { display: block; }
+
+  /* ── INTRO ── */
+  #intro {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px 20px;
+  }
+
+  .crown-icon {
+    font-size: 56px;
+    margin-bottom: 24px;
+    display: block;
+    animation: float 3s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  .intro-title {
+    font-family: 'Noto Serif KR', serif;
+    font-size: clamp(28px, 6vw, 52px);
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -1px;
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, var(--accent1), #fff 50%, var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .intro-sub {
+    font-size: 15px;
+    color: var(--text-muted);
+    max-width: 480px;
+    line-height: 1.8;
+    margin-bottom: 48px;
+    font-weight: 300;
+  }
+
+  .power-types {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 48px;
+    max-width: 560px;
+  }
+
+  .power-badge {
+    padding: 6px 14px;
+    border-radius: 100px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid;
+    letter-spacing: 0.5px;
+  }
+
+  .btn-start {
+    background: linear-gradient(135deg, var(--accent1), #e8b870);
+    color: #1a1200;
+    border: none;
+    padding: 18px 52px;
+    border-radius: 100px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'Gmarket Sans', sans-serif;
+    letter-spacing: 1px;
+    transition: all 0.3s;
+    box-shadow: 0 0 40px rgba(200,155,95,0.3);
+  }
+  .btn-start:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 50px rgba(200,155,95,0.5);
+  }
+
+  /* ── QUIZ ── */
+  #quiz {
+    min-height: 100vh;
+    padding: 24px 20px 60px;
+    max-width: 680px;
+    margin: 0 auto;
+  }
+
+  .progress-bar-wrap {
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    padding: 16px 0 20px;
+    z-index: 10;
+  }
+
+  .progress-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .progress-track {
+    height: 4px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent2), var(--accent1));
+    border-radius: 4px;
+    transition: width 0.5s ease;
+  }
+
+  .q-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px 28px;
+    margin-top: 8px;
+    animation: slideIn 0.3s ease;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .q-category {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .q-category::before {
+    content: '';
+    width: 20px;
+    height: 2px;
+    border-radius: 2px;
+    background: currentColor;
+    display: block;
+  }
+
+  .q-text {
+    font-family: 'Noto Serif KR', serif;
+    font-size: 18px;
+    line-height: 1.7;
+    color: var(--text);
+    margin-bottom: 28px;
+    font-weight: 400;
+  }
+
+  .scale-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    font-weight: 300;
+  }
+
+  .scale-options {
+    display: flex;
+    gap: 8px;
+  }
+
+  .scale-btn {
+    flex: 1;
+    aspect-ratio: 1;
+    border-radius: 12px;
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'Gmarket Sans', sans-serif;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 64px;
+  }
+
+  .scale-btn:hover {
+    border-color: var(--accent2);
+    color: var(--text);
+    background: rgba(123,104,238,0.1);
+    transform: translateY(-2px);
+  }
+
+  .scale-btn.selected {
+    border-color: var(--accent1);
+    background: rgba(200,155,95,0.15);
+    color: var(--accent1);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(200,155,95,0.2);
+  }
+
+  .q-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 24px;
+    gap: 12px;
+  }
+
+  .btn-nav {
+    padding: 12px 28px;
+    border-radius: 100px;
+    border: 1.5px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: 'Gmarket Sans', sans-serif;
+    transition: all 0.2s;
+  }
+  .btn-nav:hover { border-color: var(--accent2); color: var(--accent2); }
+  .btn-nav:disabled { opacity: 0.3; cursor: default; }
+
+  .btn-next {
+    background: linear-gradient(135deg, var(--accent2), #a098f0);
+    color: #fff;
+    border: none;
+    padding: 13px 36px;
+    border-radius: 100px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'Gmarket Sans', sans-serif;
+    transition: all 0.2s;
+    box-shadow: 0 4px 20px rgba(123,104,238,0.3);
+  }
+  .btn-next:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(123,104,238,0.5); }
+  .btn-next:disabled { opacity: 0.4; cursor: default; transform: none; box-shadow: none; }
+
+  /* ── RESULT ── */
+  #result {
+    min-height: 100vh;
+    padding: 40px 20px 80px;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  .result-header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .result-title {
+    font-family: 'Noto Serif KR', serif;
+    font-size: clamp(22px, 5vw, 36px);
+    font-weight: 700;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, var(--accent1), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .result-subtitle { font-size: 14px; color: var(--text-muted); }
+
+  /* Radar chart container */
+  .chart-wrap {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 40px;
+  }
+
+  canvas#radarChart {
+    max-width: 360px;
+    max-height: 360px;
+  }
+
+  /* Power cards */
+  .power-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+
+  .power-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    transition: all 0.3s;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .power-card:hover { border-color: var(--border); transform: translateX(4px); }
+  .power-card.top-power { border-color: var(--accent1); background: rgba(200,155,95,0.05); }
+
+  .power-rank {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-muted);
+    min-width: 36px;
+    text-align: center;
+    font-family: 'Noto Serif KR', serif;
+  }
+  .power-card.top-power .power-rank { color: var(--accent1); }
+
+  .power-icon {
+    font-size: 28px;
+    min-width: 40px;
+    text-align: center;
+  }
+
+  .power-info { flex: 1; }
+  .power-name {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .power-name-en {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+  }
+
+  .bar-track {
+    height: 6px;
+    background: var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 1s ease 0.3s;
+  }
+
+  .power-score {
+    font-size: 22px;
+    font-weight: 700;
+    min-width: 52px;
+    text-align: right;
+    font-family: 'Noto Serif KR', serif;
+  }
+
+  /* Insight box */
+  .insight-box {
+    background: linear-gradient(135deg, rgba(200,155,95,0.08), rgba(123,104,238,0.08));
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px 28px;
+    margin-bottom: 32px;
+  }
+  .insight-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--accent1);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .insight-text {
+    font-family: 'Noto Serif KR', serif;
+    font-size: 15px;
+    line-height: 1.9;
+    color: var(--text);
+  }
+
+  /* Description panel */
+  .desc-section {
+    margin-bottom: 40px;
+  }
+  .desc-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .desc-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 10px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .desc-icon { font-size: 22px; margin-top: 2px; }
+  .desc-body {}
+  .desc-name { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+  .desc-text { font-size: 13px; color: var(--text-muted); line-height: 1.7; font-weight: 300; }
+
+  .btn-retry {
+    display: block;
+    width: 100%;
+    padding: 18px;
+    background: var(--card);
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: 'Gmarket Sans', sans-serif;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+  .btn-retry:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  /* Responsive */
+  @media (max-width: 480px) {
+    .scale-btn { font-size: 12px; }
+    .q-text { font-size: 16px; }
+    .power-card { padding: 16px; gap: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="ambient ambient-1"></div>
+<div class="ambient ambient-2"></div>
+
+<!-- ── INTRO SCREEN ── -->
+<div id="intro" class="screen active">
+  <span class="crown-icon">👑</span>
+  <h1 class="intro-title">영향력 파워<br>진단 테스트</h1>
+  <p class="intro-sub">리더로서 당신이 어떤 파워를 기반으로<br>타인에게 영향을 미치는지 알아보세요.</p>
+
+  <div class="power-types">
+    <span class="power-badge" style="color:#e05c6a;border-color:rgba(224,92,106,0.4)">⚡ 강제적 파워</span>
+    <span class="power-badge" style="color:#4ecdc4;border-color:rgba(78,205,196,0.4)">🔗 관계적 파워</span>
+    <span class="power-badge" style="color:#7b68ee;border-color:rgba(123,104,238,0.4)">🎓 전문적 파워</span>
+    <span class="power-badge" style="color:#ffd93d;border-color:rgba(255,217,61,0.4)">📡 정보적 파워</span>
+    <span class="power-badge" style="color:#c89b5f;border-color:rgba(200,155,95,0.4)">⚖️ 합법적 파워</span>
+    <span class="power-badge" style="color:#ff9f7f;border-color:rgba(255,159,127,0.4)">✨ 준거적 파워</span>
+    <span class="power-badge" style="color:#a8e6cf;border-color:rgba(168,230,207,0.4)">🎁 보상적 파워</span>
+  </div>
+
+  <button class="btn-start" onclick="startQuiz()">진단 시작하기 →</button>
+</div>
+
+<!-- ── QUIZ SCREEN ── -->
+<div id="quiz" class="screen">
+  <div class="progress-bar-wrap">
+    <div class="progress-meta">
+      <span id="q-counter">1 / 28</span>
+      <span id="q-category-label"></span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <div class="q-card" id="q-card">
+    <div class="q-category" id="q-category"></div>
+    <p class="q-text" id="q-text"></p>
+
+    <div class="scale-label">
+      <span>전혀 그렇지 않다</span>
+      <span>매우 그렇다</span>
+    </div>
+    <div class="scale-options" id="scale-options"></div>
+
+    <div class="q-nav">
+      <button class="btn-nav" id="btn-prev" onclick="prevQ()">← 이전</button>
+      <button class="btn-next" id="btn-next" onclick="nextQ()">다음 →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── RESULT SCREEN ── -->
+<div id="result" class="screen">
+  <div class="result-header">
+    <div style="font-size:48px;margin-bottom:16px">📊</div>
+    <h2 class="result-title">당신의 영향력 파워 결과</h2>
+    <p class="result-subtitle">7가지 파워 유형 분석 완료</p>
+  </div>
+
+  <div class="chart-wrap">
+    <canvas id="radarChart" width="360" height="360"></canvas>
+  </div>
+
+  <div class="power-cards" id="power-cards"></div>
+
+  <div class="insight-box" id="insight-box">
+    <div class="insight-label">💡 종합 인사이트</div>
+    <div class="insight-text" id="insight-text"></div>
+  </div>
+
+  <div class="desc-section">
+    <div class="desc-title">파워 유형별 설명</div>
+    <div id="desc-cards"></div>
+  </div>
+
+  <button class="btn-retry" onclick="restart()">🔄 다시 진단하기</button>
+</div>
+
+<script>
+// ─────────────────────────────────────────
+// DATA
+// ─────────────────────────────────────────
+const POWERS = [
+  {
+    id: 'coercive',
+    name: '강제적 파워',
+    nameEn: 'Coercive Power',
+    icon: '⚡',
+    color: '#e05c6a',
+    desc: '타인에게 두려움과 불안함을 줄 수 있는 힘. 자신의 뜻에 따르지 않는 사람에게 제재를 가하거나 처벌을 통해 영향력을 행사한다.'
+  },
+  {
+    id: 'connection',
+    name: '관계적 파워',
+    nameEn: 'Connection Power',
+    icon: '🔗',
+    color: '#4ecdc4',
+    desc: '파워 있는 사람들과의 친밀한 관계에서 비롯된 힘. 사람들은 당신이 알고 있는 인맥 때문에 당신의 영향력 하에 놓인다.'
+  },
+  {
+    id: 'expert',
+    name: '전문적 파워',
+    nameEn: 'Expert Power',
+    icon: '🎓',
+    color: '#7b68ee',
+    desc: '리더가 갖고 있는 전문성과 지식·능력에 기인한 파워. 단, 타인이 인지해야만 비로소 영향력의 원천이 될 수 있다.'
+  },
+  {
+    id: 'information',
+    name: '정보적 파워',
+    nameEn: 'Information Power',
+    icon: '📡',
+    color: '#ffd93d',
+    desc: '중요한 정보를 보유하고 있기 때문에 생기는 파워. 타인이 해당 정보를 중요하다고 인지해야만 움직이는 힘이 된다.'
+  },
+  {
+    id: 'legitimate',
+    name: '합법적 파워',
+    nameEn: 'Legitimate Power',
+    icon: '⚖️',
+    color: '#c89b5f',
+    desc: '리더의 공식적인 지위에서 나오는 파워. 직급이나 직책이 높을수록 합법성의 파워도 높아지는 경향이 있다.'
+  },
+  {
+    id: 'referent',
+    name: '준거적 파워',
+    nameEn: 'Referent Power',
+    icon: '✨',
+    color: '#ff9f7f',
+    desc: '리더의 개인적 특질과 존경에서 비롯된 파워. 이 파워가 높은 리더는 사람들이 자연스럽게 칭찬하고 호감을 갖는다.'
+  },
+  {
+    id: 'reward',
+    name: '보상적 파워',
+    nameEn: 'Reward Power',
+    icon: '🎁',
+    color: '#a8e6cf',
+    desc: '리더가 사람들에게 줄 수 있는 물질적·정신적 보상에서 나오는 파워. 보상을 줄 수 있는 능력이 영향력의 기반이 된다.'
+  },
+];
+
+// 4 questions per power = 28 total
+const QUESTIONS = [
+  // Coercive
+  { power: 'coercive', text: '나는 내 지시에 따르지 않는 사람에게 불이익을 줄 수 있다.' },
+  { power: 'coercive', text: '구성원들은 내가 제재를 가할 수 있다는 사실을 알고 있다.' },
+  { power: 'coercive', text: '잘못된 행동에 대해 분명한 결과가 따른다는 것을 상대방이 인식한다.' },
+  { power: 'coercive', text: '필요하다면 규칙 위반자에게 엄격한 조치를 취한다.' },
+
+  // Connection
+  { power: 'connection', text: '나는 조직 내외부의 영향력 있는 사람들과 긴밀한 관계를 유지한다.' },
+  { power: 'connection', text: '내 인맥 덕분에 다른 사람들이 나의 부탁을 들어준다.' },
+  { power: 'connection', text: '중요한 결정자에게 접근할 수 있는 네트워크를 갖고 있다.' },
+  { power: 'connection', text: '사람들은 내가 알고 있는 사람들 때문에 나를 존중한다.' },
+
+  // Expert
+  { power: 'expert', text: '나는 내 분야에서 높은 수준의 전문 지식과 기술을 보유하고 있다.' },
+  { power: 'expert', text: '사람들은 전문적인 문제가 생기면 나에게 조언을 구한다.' },
+  { power: 'expert', text: '내 전문성은 팀이나 조직에서 광범위하게 인정받고 있다.' },
+  { power: 'expert', text: '내 의견은 내 분야의 전문성 때문에 무게감 있게 받아들여진다.' },
+
+  // Information
+  { power: 'information', text: '나는 다른 사람들이 쉽게 접근하기 어려운 중요한 정보를 갖고 있다.' },
+  { power: 'information', text: '사람들은 내가 가진 정보를 얻기 위해 나와 협력하려 한다.' },
+  { power: 'information', text: '나는 의사결정에 필요한 핵심 정보를 선별하고 공유하는 역할을 한다.' },
+  { power: 'information', text: '내가 보유한 정보가 타인의 행동에 영향을 준다.' },
+
+  // Legitimate
+  { power: 'legitimate', text: '나의 직위나 직책은 다른 사람들에게 지시할 수 있는 권한을 부여한다.' },
+  { power: 'legitimate', text: '사람들은 내 공식적인 지위 때문에 나의 요청에 응한다.' },
+  { power: 'legitimate', text: '조직 내에서 나의 역할은 권위를 갖고 결정을 내릴 수 있게 한다.' },
+  { power: 'legitimate', text: '내 직위에서 비롯된 공식적 권한이 팀원들에게 인정된다.' },
+
+  // Referent
+  { power: 'referent', text: '사람들은 나를 역할 모델로 삼고 싶어 한다.' },
+  { power: 'referent', text: '구성원들은 나와 함께 일하는 것에 자부심을 느낀다.' },
+  { power: 'referent', text: '나의 개인적 특성과 인품이 사람들의 존경을 받는다.' },
+  { power: 'referent', text: '사람들은 내가 옳다고 생각하기 때문에 자발적으로 나를 따른다.' },
+
+  // Reward
+  { power: 'reward', text: '나는 성과를 낸 사람에게 인정과 보상을 줄 수 있다.' },
+  { power: 'reward', text: '구성원들은 내가 좋은 성과에 보상을 제공한다는 것을 알고 있다.' },
+  { power: 'reward', text: '나는 물질적 또는 정신적 보상을 통해 사람들의 동기를 유발한다.' },
+  { power: 'reward', text: '성과에 따른 보상 제공이 나의 영향력을 높인다.' },
+];
+
+// ─────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────
+let answers = new Array(QUESTIONS.length).fill(null);
+let currentQ = 0;
+
+// ─────────────────────────────────────────
+// NAVIGATION
+// ─────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).style.display = '';
+  document.getElementById(id).classList.add('active');
+}
+
+function startQuiz() {
+  answers = new Array(QUESTIONS.length).fill(null);
+  currentQ = 0;
+  showScreen('quiz');
+  renderQ();
+}
+
+function restart() {
+  showScreen('intro');
+}
+
+// ─────────────────────────────────────────
+// QUIZ RENDER
+// ─────────────────────────────────────────
+function renderQ() {
+  const q = QUESTIONS[currentQ];
+  const power = POWERS.find(p => p.id === q.power);
+  const total = QUESTIONS.length;
+
+  document.getElementById('q-counter').textContent = `${currentQ + 1} / ${total}`;
+  document.getElementById('q-category-label').textContent = power.name;
+  document.getElementById('progress-fill').style.width = `${((currentQ + 1) / total) * 100}%`;
+
+  const catEl = document.getElementById('q-category');
+  catEl.textContent = `${power.icon} ${power.name}`;
+  catEl.style.color = power.color;
+
+  document.getElementById('q-text').textContent = q.text;
+
+  // Scale buttons 1-5
+  const opts = document.getElementById('scale-options');
+  opts.innerHTML = '';
+  for (let v = 1; v <= 5; v++) {
+    const btn = document.createElement('button');
+    btn.className = 'scale-btn' + (answers[currentQ] === v ? ' selected' : '');
+    btn.textContent = v;
+    btn.style.maxWidth = '64px';
+    if (answers[currentQ] === v) btn.style.setProperty('--sel-color', power.color);
+    btn.onclick = () => selectAnswer(v, power.color);
+    opts.appendChild(btn);
+  }
+
+  document.getElementById('btn-prev').disabled = currentQ === 0;
+  document.getElementById('btn-next').textContent = currentQ === total - 1 ? '결과 보기 ✓' : '다음 →';
+  document.getElementById('btn-next').disabled = answers[currentQ] === null;
+}
+
+function selectAnswer(val, color) {
+  answers[currentQ] = val;
+  document.querySelectorAll('.scale-btn').forEach((btn, i) => {
+    const v = i + 1;
+    btn.className = 'scale-btn' + (v === val ? ' selected' : '');
+    if (v === val) {
+      btn.style.borderColor = color;
+      btn.style.color = color;
+      btn.style.background = color + '22';
+    } else {
+      btn.style.borderColor = '';
+      btn.style.color = '';
+      btn.style.background = '';
+    }
+  });
+  document.getElementById('btn-next').disabled = false;
+}
+
+function nextQ() {
+  if (answers[currentQ] === null) return;
+  if (currentQ === QUESTIONS.length - 1) {
+    showResult();
+    return;
+  }
+  currentQ++;
+  renderQAnim();
+}
+
+function prevQ() {
+  if (currentQ === 0) return;
+  currentQ--;
+  renderQAnim();
+}
+
+function renderQAnim() {
+  const card = document.getElementById('q-card');
+  card.style.animation = 'none';
+  void card.offsetWidth;
+  card.style.animation = '';
+  renderQ();
+}
+
+// ─────────────────────────────────────────
+// RESULTS
+// ─────────────────────────────────────────
+function calcScores() {
+  const scores = {};
+  POWERS.forEach(p => scores[p.id] = 0);
+  QUESTIONS.forEach((q, i) => {
+    if (answers[i] !== null) scores[q.power] += answers[i];
+  });
+  return scores;
+}
+
+function showResult() {
+  showScreen('result');
+  const scores = calcScores();
+  const maxScore = 20; // 4 questions × 5
+
+  // Ranked
+  const ranked = POWERS.map(p => ({
+    ...p,
+    score: scores[p.id],
+    pct: Math.round((scores[p.id] / maxScore) * 100)
+  })).sort((a, b) => b.score - a.score);
+
+  // Power cards
+  const cardsEl = document.getElementById('power-cards');
+  cardsEl.innerHTML = '';
+  ranked.forEach((p, idx) => {
+    const card = document.createElement('div');
+    card.className = 'power-card' + (idx === 0 ? ' top-power' : '');
+    card.style.animationDelay = `${idx * 0.07}s`;
+    card.innerHTML = `
+      <div class="power-rank">${idx + 1}</div>
+      <div class="power-icon">${p.icon}</div>
+      <div class="power-info">
+        <div class="power-name" style="color:${p.color}">${p.name}</div>
+        <div class="power-name-en">${p.nameEn}</div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:0%;background:${p.color}" data-pct="${p.pct}"></div>
+        </div>
+      </div>
+      <div class="power-score" style="color:${p.color}">${p.score}<span style="font-size:12px;color:var(--text-muted)">/20</span></div>
+    `;
+    cardsEl.appendChild(card);
+  });
+
+  // Animate bars
+  setTimeout(() => {
+    document.querySelectorAll('.bar-fill').forEach(bar => {
+      bar.style.width = bar.dataset.pct + '%';
+    });
+  }, 200);
+
+  // Insight
+  const top = ranked[0];
+  const top2 = ranked[1];
+  const bottom = ranked[ranked.length - 1];
+  const insightMap = {
+    coercive: '명확한 규율과 결과를 통해 조직을 이끄는 리더입니다. 구성원들은 당신의 기준이 분명하다는 것을 압니다. 다만, 신뢰와 자발성을 함께 키우면 장기적 영향력이 더욱 강화됩니다.',
+    connection: '탁월한 네트워크가 당신의 가장 강력한 자산입니다. 인맥의 힘으로 문제를 해결하고 기회를 만들어냅니다. 관계의 깊이와 다양성을 계속 넓혀가세요.',
+    expert: '전문성으로 신뢰를 얻는 리더입니다. 사람들은 당신의 지식과 판단을 믿고 따릅니다. 전문성을 지속적으로 업데이트하고 조직 내에 공유하면 영향력이 더욱 확장됩니다.',
+    information: '정보력이 당신의 핵심 파워입니다. 중요한 정보를 선별하고 활용하는 능력이 탁월합니다. 정보를 적시에 공유하는 전략적 판단이 영향력을 더욱 높입니다.',
+    legitimate: '공식적 권위를 효과적으로 활용하는 리더입니다. 지위에서 나오는 파워를 잘 인식하고 있습니다. 권위를 공정하게 사용할 때 구성원들의 신뢰도 함께 높아집니다.',
+    referent: '사람들이 자발적으로 따르는 카리스마 있는 리더입니다. 인품과 존경심이 가장 지속 가능한 영향력의 원천입니다. 이 파워는 어떤 지위나 자원이 없어도 유효합니다.',
+    reward: '보상과 인정을 통해 동기를 이끌어내는 리더입니다. 사람들의 노력을 알아봐 주는 능력이 탁월합니다. 물질적 보상과 함께 정서적 인정도 강력한 도구로 활용하세요.',
+  };
+  document.getElementById('insight-text').textContent =
+    `당신의 가장 강한 파워는 ${top.icon} ${top.name}(${top.score}점)이며, ${top2.icon} ${top2.name}(${top2.score}점)이 그 뒤를 잇습니다. ${insightMap[top.id]}`;
+
+  // Desc cards
+  const descEl = document.getElementById('desc-cards');
+  descEl.innerHTML = '';
+  ranked.forEach(p => {
+    const d = document.createElement('div');
+    d.className = 'desc-card';
+    d.innerHTML = `
+      <div class="desc-icon">${p.icon}</div>
+      <div class="desc-body">
+        <div class="desc-name" style="color:${p.color}">${p.name} <span style="color:var(--text-muted);font-weight:300;font-size:12px">${p.nameEn}</span></div>
+        <div class="desc-text">${p.desc}</div>
+      </div>
+    `;
+    descEl.appendChild(d);
+  });
+
+  // Draw radar
+  setTimeout(() => drawRadar(ranked), 300);
+}
+
+// ─────────────────────────────────────────
+// RADAR CHART (vanilla canvas)
+// ─────────────────────────────────────────
+function drawRadar(ranked) {
+  const canvas = document.getElementById('radarChart');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W / 2, cy = H / 2;
+  const R = Math.min(W, H) * 0.38;
+  const N = ranked.length;
+  const maxVal = 20;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Grid
+  for (let level = 1; level <= 5; level++) {
+    const r = (R * level) / 5;
+    ctx.beginPath();
+    for (let i = 0; i < N; i++) {
+      const angle = (Math.PI * 2 * i) / N - Math.PI / 2;
+      const x = cx + r * Math.cos(angle);
+      const y = cy + r * Math.sin(angle);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    if (level === 5) {
+      ctx.fillStyle = 'rgba(255,255,255,0.02)';
+      ctx.fill();
+    }
+  }
+
+  // Axes
+  for (let i = 0; i < N; i++) {
+    const angle = (Math.PI * 2 * i) / N - Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + R * Math.cos(angle), cy + R * Math.sin(angle));
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Labels
+  for (let i = 0; i < N; i++) {
+    const angle = (Math.PI * 2 * i) / N - Math.PI / 2;
+    const r = R + 28;
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    ctx.font = '13px Gmarket Sans, sans-serif';
+    ctx.fillStyle = ranked[i].color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ranked[i].icon, x, y);
+  }
+
+  // Data polygon
+  ctx.beginPath();
+  for (let i = 0; i < N; i++) {
+    const angle = (Math.PI * 2 * i) / N - Math.PI / 2;
+    const ratio = ranked[i].score / maxVal;
+    const r = R * ratio;
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+
+  // Gradient fill
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+  grad.addColorStop(0, 'rgba(123,104,238,0.5)');
+  grad.addColorStop(1, 'rgba(200,155,95,0.2)');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(200,155,95,0.8)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Dots
+  for (let i = 0; i < N; i++) {
+    const angle = (Math.PI * 2 * i) / N - Math.PI / 2;
+    const ratio = ranked[i].score / maxVal;
+    const r = R * ratio;
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    ctx.beginPath();
+    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.fillStyle = ranked[i].color;
+    ctx.fill();
+    ctx.strokeStyle = '#0a0a0f';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+}
+</script>
+</body>
+</html>
